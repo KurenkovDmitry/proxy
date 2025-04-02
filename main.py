@@ -97,15 +97,29 @@ def handle_client(client_socket):
                 client_socket.close()
                 return
 
+            # Отправляем подтверждение клиенту
             client_socket.sendall(b"HTTP/1.0 200 Connection established\r\n\r\n")
-            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            try:
-                server_socket.connect((host, port))
-            except socket.gaierror as e:
-                print(f"Failed to connect to {host}:{port}: {e}")
-                client_socket.close()
-                return
 
+            # Создаем сокет для соединения с целевым сервером
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.connect((host, port))
+
+            # Настройка TLS для клиента (MITM)
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            cert = generate_cert_for_host(host, ca_cert, ca_key, cert_key, serial_counter)
+            with open(f"{host}.crt", "wb") as f:
+                f.write(cert)
+            context.load_cert_chain(certfile=f"{host}.crt", keyfile="cert.key")
+            ssl_client_socket = context.wrap_socket(client_socket, server_side=True)
+
+            # Настройка TLS для соединения с целевым сервером
+            server_context = ssl.create_default_context()
+            ssl_server_socket = server_context.wrap_socket(server_socket, server_hostname=host)
+
+            # Увеличиваем счетчик серийного номера для следующего сертификата
+            serial_counter += 1
+
+            # Пересылка данных через зашифрованные сокеты
             def proxy_data(src, dst):
                 try:
                     while True:
@@ -119,8 +133,9 @@ def handle_client(client_socket):
                     src.close()
                     dst.close()
 
-            threading.Thread(target=proxy_data, args=(client_socket, server_socket)).start()
-            threading.Thread(target=proxy_data, args=(server_socket, client_socket)).start()
+            # Запускаем потоки для двусторонней пересылки данных
+            threading.Thread(target=proxy_data, args=(ssl_client_socket, ssl_server_socket)).start()
+            threading.Thread(target=proxy_data, args=(ssl_server_socket, ssl_client_socket)).start()
 
         else:
             # Обработка HTTP
