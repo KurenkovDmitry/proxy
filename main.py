@@ -11,7 +11,7 @@ import tabulate
 # Список для хранения запросов
 requests = []
 request_id = 0
-serial_counter = 2  # Начинаем с 2, как в примере скрипта
+serial_counter = 2  # Начинаем с 2
 
 
 # Генерация корневого сертификата и ключа один раз
@@ -297,7 +297,6 @@ class APIHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"Invalid format. Use 'json' or 'table'.")
 
-        # Остальные endpoints остаются без изменений
         elif self.path.startswith("/repeat/"):
             req_id = int(self.path.split("/")[-1])
             response = repeat_request(req_id)
