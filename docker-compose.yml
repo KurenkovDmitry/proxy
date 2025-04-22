@@ -10,3 +10,9 @@ services:
       - 8.8.4.4
     environment:
       - PYTHONUNBUFFERED=1
+    depends_on:
+      - mongo
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
